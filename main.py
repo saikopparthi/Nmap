@@ -17,9 +17,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Celery configuration
-sqlite_db_path = os.path.abspath('celery.sqlite')
-app.config['CELERY_BROKER_URL'] = f'sqla+sqlite:///{sqlite_db_path}'
-app.config['CELERY_RESULT_BACKEND'] = f'db+sqlite:///{sqlite_db_path}'
+# sqlite_db_path = os.path.abspath('celery.sqlite')
+# app.config['CELERY_BROKER_URL'] = f'sqla+sqlite:///{sqlite_db_path}'
+# app.config['CELERY_RESULT_BACKEND'] = f'db+sqlite:///{sqlite_db_path}'
+
+# Celery configuration with Redis
+app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
 

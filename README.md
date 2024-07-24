@@ -63,3 +63,18 @@ python main.py
 6. IP addresses and hostnames are not interchangeable in comparisons (i.e., we only compare IP to IP or hostname to hostname).
 7. The Celery worker runs in the same process as the Flask application.
 8. SQLite is sufficient for the database backend (not suitable for high concurrency).
+
+
+## The scan differences feature compares the following aspects:
+
+1. IP Address: Checks if the IP address of the target has changed.
+2. Latency: Compares the response time of the target.
+3. OS Detection: Identifies any changes in the detected operating system.
+4. Ports:
+   - Newly Opened: Lists any ports that were closed in the old scan but are now open.
+   - Newly Closed: Lists any ports that were open in the old scan but are now closed.
+   - Changed State: Identifies ports whose state has changed (e.g., from filtered to open).
+   - Changed Services: Lists ports where the detected service has changed.
+5. Script Results: Compares the results of any Nmap scripts that were run, identifying new, removed, or changed script outputs.
+
+This feature allows you to quickly identify changes in a target's network configuration or security posture between scans.
