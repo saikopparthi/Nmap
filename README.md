@@ -21,7 +21,7 @@ To run the application using Docker:
 
 2. Run the container:
    ```bash
-   docker run -d -p 5000:5000 --name nmap-web-service yourusername/nmap-web-service:latest
+   docker run -d -p 5000:5000 --name nmap-web-service saikopparthi/nmap-web-service:latest
    ```
 
 The application will be accessible at `http://localhost:5000`.
@@ -61,6 +61,55 @@ nmap --version
 ```bash
 python main.py
 ```
+## Running on Replit
+
+You can run this code directly on Replit by clicking on this link: [Nmap Web Service on Replit](https://replit.com/@saikopparthi/Nmapwebviewapis)
+
+**Caution:** Please be careful when making changes to the files on Replit. Modifying the existing code may cause the application to malfunction. It's recommended to use Replit primarily for running the application and executing sample curl commands.
+
+### Sample Curl Commands
+
+Here are some sample curl commands you can use to interact with the API:
+
+1. Initiate a new scan:
+   ```bash
+   curl -X POST -H "Content-Type: application/json" -d '{"target": "sai.cs.ucdavis.edu", "options": {"-p": "80,443,8080"}}' http://localhost:5000/scan
+   ```
+
+2. Get the result of a specific scan:
+   ```bash
+   curl http://localhost:5000/scan/<task_id>
+   ```
+   Replace `<task_id>` with the actual task ID returned from the scan initiation.
+
+3. Get recent scans for a target:
+   ```bash
+   curl http://localhost:5000/scans/sai.cs.ucdavis.edu
+   ```
+
+4. Get the latest scan for a target:
+   ```bash
+   curl http://localhost:5000/latest_scan/sai.cs.ucdavis.edu
+   ```
+
+5. Get changes between the two most recent scans:
+   ```bash
+   curl http://localhost:5000/scan_changes/sai.cs.ucdavis.edu
+   ```
+
+6. Check Celery status:
+   ```bash
+   curl http://localhost:5000/celery_status
+   ```
+
+7. Health check:
+   ```bash
+   curl http://localhost:5000/health
+   ```
+
+**Note:** When running these commands on Replit, replace `http://localhost:5000` with the URL provided by Replit for your application.
+
+**Caution:** Be mindful when running scans. Ensure you have permission to scan the target hosts. Some of these commands may require elevated privileges and might not work in the Replit environment due to security restrictions. Always obtain proper authorization before scanning any networks or systems you do not own.
 
 ## API Endpoints
 
@@ -132,3 +181,100 @@ docker-compose up -d
 ```
 
 This will start your web service, a Celery worker, and a Redis instance, all configured to work together.
+
+### Advanced Deployment with Docker Compose
+
+For a more complex setup including Redis, Celery, and Nginx (pronounced as Engine-x :) ) for load balancing, use Docker Compose:
+
+1. Create a `docker-compose.yml` file in your project root:
+
+```yaml
+version: '3'
+services:
+  web:
+    image: saikopparthi/nmap-web-service:latest
+    deploy:
+      replicas: 3
+    ports:
+      - "5000-5002:5000"
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+  celery:
+    image: saikopparthi/nmap-web-service:latest
+    deploy:
+      replicas: 2
+    command: celery -A main.celery worker --loglevel=info
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+  redis:
+    image: "redis:alpine"
+
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+```
+
+2. Create an `nginx.conf` file in the same directory:
+
+```nginx
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream web {
+        server web:5000;
+        server web:5001;
+        server web:5002;
+    }
+
+    server {
+        listen 80;
+
+        location / {
+            proxy_pass http://web;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+}
+```
+
+3. Run the application:
+
+```bash
+docker-compose up -d
+```
+
+The application will be accessible at `http://localhost`.
+
+### Scaling the Application
+
+To scale the application, you can use Docker Compose's `scale` option:
+
+```bash
+docker-compose up --scale web=3 --scale celery=2 -d
+```
+
+This command will start 3 instances of the web service and 2 Celery workers. Nginx will automatically load balance requests between the web instances.
+
+To scale down or up, simply run the command again with different numbers:
+
+```bash
+docker-compose up --scale web=5 --scale celery=3 -d
+```
+
+This flexibility allows you to adjust the capacity of your application based on demand. (Can talk more in the interview... on back-up envolpe numbers at scale)
