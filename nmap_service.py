@@ -10,10 +10,12 @@ class NmapService:
         self.result_parser = result_parser
         self.db_manager = db_manager
 
-    def run_scan(self, target: str, options: Dict[str, str]) -> str:
+    def run_scan(self, target: str, options: Dict[str, str]) -> Dict:
         result, command = self.scanner.scan(target, options)
-        self.db_manager.save_scan_result(target, options, result, command)
-        return result
+        parsed_result = self.result_parser.parse(result)
+        self.db_manager.save_scan_result(target, options, result,
+                                         parsed_result, command)
+        return parsed_result
 
     def get_recent_scans(self, target: str, limit: int = 5) -> List[Dict]:
         return self.db_manager.get_recent_scans(target, limit)
@@ -22,10 +24,8 @@ class NmapService:
         recent_scans = self.db_manager.get_recent_scans(target, 2)
         if len(recent_scans) < 2:
             return {"error": "Not enough scans to compare"}
-
-        new_scan = self.result_parser.parse(recent_scans[0]["result"])
-        old_scan = self.result_parser.parse(recent_scans[1]["result"])
-
+        new_scan = recent_scans[0]["result"]
+        old_scan = recent_scans[1]["result"]
         changes = {
             "ip_change": new_scan['ip'] != old_scan['ip'],
             "new_ip": new_scan['ip'],
@@ -42,20 +42,16 @@ class NmapService:
             "changed_services": [],
             "script_changes": {}
         }
-
         self._compare_ports(new_scan, old_scan, changes)
         self._compare_scripts(new_scan, old_scan, changes)
-
         return changes
 
     def _compare_ports(self, new_scan: Dict, old_scan: Dict, changes: Dict):
         all_ports = set(new_scan['ports'].keys()) | set(
             old_scan['ports'].keys())
-
         for port in all_ports:
             new_port_info = new_scan['ports'].get(port)
             old_port_info = old_scan['ports'].get(port)
-
             if not old_port_info and new_port_info:
                 changes['newly_opened'].append(
                     f"{port}: {new_port_info['service']}")
@@ -75,9 +71,7 @@ class NmapService:
     def _compare_scripts(self, new_scan: Dict, old_scan: Dict, changes: Dict):
         new_scripts = new_scan.get('script_results', {})
         old_scripts = old_scan.get('script_results', {})
-
         all_scripts = set(new_scripts.keys()) | set(old_scripts.keys())
-
         for script in all_scripts:
             if script not in old_scripts:
                 changes['script_changes'][script] = "New script result"

@@ -45,15 +45,14 @@ def init_controllers(service: NmapService, celery: Celery):
     nmap_service = service
     celery_app = celery
 
-    # Define Celery task after celery_app is initialized
     @celery_app.task
     def run_nmap_scan(target: str, options: Dict[str, str]) -> Dict:
         if not is_valid_target(target):
             raise ValueError("Invalid IP address or hostname")
-        result = nmap_service.run_scan(target, options)
-        return nmap_service.result_parser.parse(result)
+        return nmap_service.run_scan(target, options)
 
-    # Update the scan function to use the newly defined task
+    @nmap_bp.route('/scan', methods=['POST'])
+    @rate_limit
     def scan():
         data = request.get_json()
         target = data.get('target')
@@ -76,9 +75,6 @@ def init_controllers(service: NmapService, celery: Celery):
             return jsonify(
                 {"error":
                  "Failed to initiate scan. Please try again later."}), 500
-
-    # Register the updated scan function with the blueprint
-    nmap_bp.route('/scan', methods=['POST'])(rate_limit(scan))
 
 
 @nmap_bp.route('/scan/<task_id>', methods=['GET'])
