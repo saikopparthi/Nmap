@@ -4,12 +4,31 @@ A web service for running Nmap scans, retrieving results, and comparing changes 
 
 ## Prerequisites
 
-- Python 3.8+
+- Docker (for containerized deployment)
+- Python 3.8+ (for local development)
 - Nmap
 - Flask
 - Celery
 
-## Installing Nmap (RPM-based Linux)
+## Docker Deployment
+
+To run the application using Docker:
+
+1. Pull the Docker image:
+   ```bash
+   docker pull saikopparthi/nmap-web-service:latest
+   ```
+
+2. Run the container:
+   ```bash
+   docker run -d -p 5000:5000 --name nmap-web-service yourusername/nmap-web-service:latest
+   ```
+
+The application will be accessible at `http://localhost:5000`.
+
+## Local Development
+
+### Installing Nmap (RPM-based Linux)
 
 For RPM-based Linux distributions (like Red Hat, CentOS, Fedora), use these commands:
 
@@ -24,11 +43,11 @@ Verify the installation:
 nmap --version
 ```
 
-## Installation
+### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/nmap-web-service.git
+   git clone https://github.com/saikopparthi/nmap-web-service.git
    cd nmap-web-service
    ```
 
@@ -37,7 +56,7 @@ nmap --version
    pip install -r requirements.txt
    ```
 
-## Running the Application
+### Running the Application Locally
 
 ```bash
 python main.py
@@ -59,11 +78,9 @@ python main.py
 2. The application is run in a controlled environment where it's safe to execute Nmap scans.
 3. Only the two most recent scans are compared for changes.
 4. All Nmap options provided by the user are considered valid and safe to use.
-5. The application is not using Docker for containerization.
-6. IP addresses and hostnames are not interchangeable in comparisons (i.e., we only compare IP to IP or hostname to hostname).
-7. The Celery worker runs in the same process as the Flask application.
-8. SQLite is sufficient for the database backend (not suitable for high concurrency).
-
+5. IP addresses and hostnames are not interchangeable in comparisons (i.e., we only compare IP to IP or hostname to hostname).
+6. The Celery worker runs in the same process as the Flask application.
+7. SQLite is sufficient for the database backend (not suitable for high concurrency).
 
 ## The scan differences feature compares the following aspects:
 
@@ -78,3 +95,40 @@ python main.py
 5. Script Results: Compares the results of any Nmap scripts that were run, identifying new, removed, or changed script outputs.
 
 This feature allows you to quickly identify changes in a target's network configuration or security posture between scans.
+
+## Docker Compose (Optional)
+
+For a more complex setup including Redis and Celery, you can use Docker Compose. Create a `docker-compose.yml` file in your project root:
+
+```yaml
+version: '3'
+services:
+  web:
+    image: saikopparthi/nmap-web-service:latest
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+  celery:
+    image: saikopparthi/nmap-web-service:latest
+    command: celery -A main.celery worker --loglevel=info
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+  redis:
+    image: "redis:alpine"
+
+```
+
+Then run:
+
+```bash
+docker-compose up -d
+```
+
+This will start your web service, a Celery worker, and a Redis instance, all configured to work together.
